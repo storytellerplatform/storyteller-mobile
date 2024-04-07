@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Windows",
+            "cwd": "D:\\storyteller_mobile",
+            "type": "reactnative",
+            "request": "launch",
+            "platform": "windows"
+        }
+    ]
+}
