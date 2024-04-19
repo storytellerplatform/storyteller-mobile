@@ -17,8 +17,8 @@ const initialState: InitialStateType = {
   ]
 }
 
-export const counterSlice = createSlice({
-  name: 'counter',
+export const storySlice = createSlice({
+  name: 'story',
   initialState,
   reducers: {
    createStory: (state, action: PayloadAction<StoryType>) => {
@@ -34,6 +34,6 @@ export const counterSlice = createSlice({
 
 
 
-export const { createStory } = counterSlice.actions
+export const { createStory } = storySlice.actions
 
-export default counterSlice.reducer
+export default storySlice.reducer

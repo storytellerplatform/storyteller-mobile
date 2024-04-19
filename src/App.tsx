@@ -10,6 +10,7 @@ import Rank from './screen/Rank';
 import Profile from './screen/Profile';
 import Reading from './screen/Reading';
 import Tests from './screen/Test';
+import BookInfo from './screen/BookInfo';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -24,6 +25,7 @@ export default function App() {
           <Stack.Screen name="Rank" component={Rank} />
           <Stack.Screen name="Profile" component={Profile} />
           <Stack.Screen name="Reading" component={Reading} />
+          <Stack.Screen name="BookInfo" component={BookInfo} />
           <Stack.Screen name="Tests" component={Tests} />
         </Stack.Navigator>
       </NavigationContainer>

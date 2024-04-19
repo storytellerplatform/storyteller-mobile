@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Rank: undefined,
   Profile: undefined,
   Reading: { id: String },
+  BookInfo: { id: String },
   Tests: undefined,
 };
 
@@ -20,6 +21,7 @@ export type SearchStackProps = NativeStackScreenProps<RootStackParamList, 'Searc
 export type RankStackProps = NativeStackScreenProps<RootStackParamList, 'Rank'>;
 export type ProfileStackProps = NativeStackScreenProps<RootStackParamList, 'Profile'>;
 export type ReadingStackProps = NativeStackScreenProps<RootStackParamList, 'Reading'>;
+export type BookInfoStackProps = NativeStackScreenProps<RootStackParamList, 'BookInfo'>;
 
 export type LayoutStackProps = NativeStackScreenProps<RootStackParamList, 'Home' | 'Profile' | 'Search' | 'Rank' | 'Library'>;
 export type BookListStackProps = NativeStackScreenProps<RootStackParamList, 'Library'>;
@@ -31,7 +33,7 @@ export type BookType = {
   author: string;
   subtitle: string;
   imageUrl: string;
-  content: string[][];
+  content: string;
 };
 
 export type StoryType = {

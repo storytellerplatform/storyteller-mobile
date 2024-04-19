@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, StyleSheet, StatusBar, Image, Modal, Button, TouchableWithoutFeedback, useWindowDimensions } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { ScrollView, View, Text, TouchableOpacity, StyleSheet, StatusBar, Image, Modal, Button, TouchableWithoutFeedback, useWindowDimensions, GestureResponderEvent } from 'react-native';
 import ReadingSettingIcon from '../assets/settings.png';
 import bookdata from '../data/book.json';
 import { bgColors } from '../data/settingStory';
@@ -8,10 +8,12 @@ import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
 import { BookType, ReadingStackProps } from '../types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { primaryColor } from '../globalStyle';
+import { primaryColor, secondaryColor } from '../globalStyle';
 import PagerView from 'react-native-pager-view';
 import createIdxArray from '../utils/createIndexArr';
-import { createMusic } from '../Api';
+import { createMusic, testApi } from '../Api';
+import replaceSpecialChars from './../utils/replaceSpecialChars';
+import { rightArrowImage, settingsImage } from '../utils/image';
 
 interface ReadingPageProps {
   navigation: ReadingStackProps['navigation']
@@ -19,15 +21,30 @@ interface ReadingPageProps {
 };
 
 const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
+  // test
+  useEffect(() => {
+    const test = async () => {
+      console.log((await testApi()).data);
+    };
+    test();
+  }, [])
+
   const currentDate = new Date();
-  const currentHour = currentDate.getHours();
-  const currentMinute = currentDate.getMinutes();
+  const currentTime = currentDate.toLocaleTimeString('en-US', {
+    hour12: false,
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  const { width, height } = useWindowDimensions();
+
+  const pagerViewRef = useRef<PagerView>(null);
 
   const [isLeisureMode, setIsLeisureMode] = useState<boolean>(false);
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [showHeaderFooter, setShowHeaderFooter] = useState<boolean>(false);
   const [bgColor, setBgColor] = useState<string>('#FCE6C9');
-  const [fontSize, setFontSize] = useState<number>(16);
+  const [fontSize, setFontSize] = useState<number>(22);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [musicLoading, setMusicLoading] = useState<boolean>(false);
   const [sounds, setSound] = useState<Audio.Sound | null>(null);
@@ -55,49 +72,54 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
   };
 
   const handleFontSizeClick = (adjust: number) => {
+    if (fontSize === 28 || fontSize === 16) return;
     setFontSize((preFS) => preFS + adjust);
   };
 
-  useEffect(() => {
-    navigation.setOptions({ headerShown: showHeaderFooter });
-  }, [showHeaderFooter, navigation]);
-
-  const handleScreenTap = () => {
-    setShowHeaderFooter(!showHeaderFooter);
+  const onPageSelected = (event: { nativeEvent: { position: number } }) => {
+    setCurrentPage(event.nativeEvent.position);
   };
 
-  useEffect(() => {
-    navigation.setOptions({
-      title: book_in_index?.title,
-      headerStyle: {
-        backgroundColor: primaryColor,
-      },
-      headerTintColor: 'black',
-      headerTitleStyle: {
-        fontWeight: 'bold',
-      },
-      headerRight: () => (
-        <TouchableOpacity onPress={handleSettingsModal}>
-          <Image source={ReadingSettingIcon} style={{ width: 30, height: 30, alignSelf: 'center' }} />
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, handleSettingsModal]);
+  const goToPage = (pageNumber: number) => {
+    pagerViewRef.current?.setPage(pageNumber);
+  };
+
+  // useEffect(() => {
+  //   navigation.setOptions({ headerShown: showHeaderFooter });
+  // }, [showHeaderFooter, navigation]);
+
+  // useEffect(() => {
+  //   navigation.setOptions({
+  //     title: book_in_index?.title,
+  //     headerStyle: {
+  //       backgroundColor: primaryColor,
+  //     },
+  //     headerTintColor: 'black',
+  //     headerTitleStyle: {
+  //       fontWeight: 'bold',
+  //     },
+  //     headerRight: () => (
+  //       <TouchableOpacity onPress={handleSettingsModal}>
+  //         <Image source={ReadingSettingIcon} style={{ width: 30, height: 30, alignSelf: 'center' }} />
+  //       </TouchableOpacity>
+  //     ),
+
+  //   });
+  // }, [navigation, handleSettingsModal]);
 
   const fetchAndPlayWavFile = async () => {
     setMusicLoading(true);
 
     try {
       const response = await createMusic(
-        book_in_index.content[0][2],
-        5,
+        replaceSpecialChars(book_in_index.content),
+        30,
       );
 
       const buffer = Buffer.from(response.data, 'binary').toString('base64');
       const path = FileSystem.documentDirectory + 'music.wav';
       await FileSystem.writeAsStringAsync(path, buffer, { encoding: FileSystem.EncodingType.Base64 });
 
-      // todo: 修改
       const { sound } = await Audio.Sound.createAsync({ uri: path });
       setSound(sound);
       await sound.playAsync();
@@ -168,25 +190,52 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
   //   };
   // }, [sound]);
 
-  const onPageSelected = (event: { nativeEvent: { position: number } }) => {
-    setCurrentPage(event.nativeEvent.position);
-  };
 
   const lineHeight = 52;
-  const width = useWindowDimensions().width;
-  const height = useWindowDimensions().height;
   const PerPageCount = (width / fontSize) * (height / lineHeight);
-  const totalPages = book_in_index.content[0][2].length / PerPageCount;
+  const totalPages = book_in_index.content.length / PerPageCount;
+
+  const handleScreenTap = (event: GestureResponderEvent) => {
+    const { locationX } = event.nativeEvent;
+    const thirdOfWidth = width / 3;
+    if (locationX < thirdOfWidth) {
+      goToPage(Math.max(currentPage - 1, 0));
+    } else if (locationX > 2 * thirdOfWidth) {
+      goToPage(Math.min(currentPage + 1, totalPages));
+    } else {
+      setShowHeaderFooter((prevState) => !prevState);
+    }
+  };
+
+  const handleShadowTap = () => {
+    setShowHeaderFooter((prevState) => !prevState);
+  };
 
   return (
     <SafeAreaView style={{ backgroundColor: `${bgColor}`, ...styles.container }}>
       <StatusBar hidden={true} translucent={true} />
 
       {showHeaderFooter && (
-        <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.navigate('Library')}>
-          </TouchableOpacity>
-        </View>
+        <>
+          <View style={styles.header}>
+            <View style={styles.headerLeftSection}>
+              <TouchableOpacity onPress={() => navigation.navigate('Library')}>
+                <Image style={styles.headerRightIcon} source={rightArrowImage} />
+              </TouchableOpacity>
+              <Text style={styles.headerText}>{book_in_index.title}</Text>
+            </View>
+            <TouchableOpacity onPress={() => setSettingsModalVisible((prevState) => !prevState)}>
+              <Image style={styles.headerLeftIcon} source={settingsImage} />
+            </TouchableOpacity>
+          </View>
+          <TouchableWithoutFeedback
+            onPress={handleShadowTap}
+          >
+            <View
+              style={styles.overShadow}
+            ></View>
+          </TouchableWithoutFeedback>
+        </>
       )}
 
       <Modal
@@ -277,10 +326,11 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
         </TouchableOpacity>
       </Modal>
 
-
+      {/* Main Content */}
       <PagerView
         style={{ flex: 1 }}
         onPageSelected={onPageSelected}
+        ref={pagerViewRef}
         initialPage={0}
       >
         {createIdxArray(totalPages).map((_, index) => (
@@ -291,8 +341,8 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
               activeOpacity={1}
             >
               <View style={styles.content}>
-                <Text style={styles.novelText} >
-                  {book_in_index.content[0][2].slice(_ * PerPageCount, _ * PerPageCount + PerPageCount)}
+                <Text style={[styles.novelText, { fontSize: fontSize }]} >
+                  {book_in_index.content.slice(_ * PerPageCount, _ * PerPageCount + PerPageCount)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -306,11 +356,11 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
         </View>
         <View style={{ flex: 0.2, alignItems: 'center' }}>
           <Text style={[styles.footerText,]}>
-            {currentPage + 1} / {Number(totalPages.toFixed(0))}
+            {currentPage + 1} / {Number(totalPages.toFixed(0)) + 1}
           </Text>
         </View>
         <View style={{ flex: 0.4, alignItems: 'flex-end' }}>
-          <Text style={styles.footerText}>{currentHour}:{currentMinute}</Text>
+          <Text style={styles.footerText}>{currentTime}</Text>
         </View>
       </View>
     </SafeAreaView>
@@ -327,18 +377,56 @@ const styles = StyleSheet.create({
   touchableArea: {
     position: 'absolute',
     top: 0,
-    bottom: 0,
     left: 0,
-    right: 0,
     justifyContent: 'center',
     alignItems: 'center',
   },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    position: 'absolute',
+    width: '100%',
+    backgroundColor: '#2b2b2b',
+    paddingHorizontal: 20,
+    paddingTop: '12%',
+    paddingBottom: 20,
+    zIndex: 9999,
+  },
+  headerLeftSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 20,
+  },
+  headerRightIcon: {
+    width: 26,
+    height: 26,
+    transform: [{ rotate: '180deg' }],
+  },
+  headerText: {
+    color: '#c4c4c4',
+    fontSize: 20,
+    fontWeight: '600',
+  },
+  headerLeftIcon: {
+    width: 32,
+    height: 32,
+  },
+  overShadow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#676767',
+    opacity: 0.3,
+    zIndex: 9990,
   },
   content: {
     flex: 1,
     alignItems: 'center',
     paddingTop: 20,
+    paddingBottom: 30,
     paddingHorizontal: 6,
   },
   book_title: {
@@ -458,8 +546,7 @@ const styles = StyleSheet.create({
   },
   novelText: {
     paddingHorizontal: 6,
-    lineHeight: 40,
-    fontSize: 22,
+    lineHeight: 32,
     paddingBottom: 10,
   },
   footer: {
@@ -472,10 +559,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 10,
     paddingHorizontal: 24,
+    zIndex: 9000,
   },
   footerText: {
-    fontSize: 12,
-    fontWeight: '400'
+    fontSize: 14,
+    fontWeight: '500'
   },
 });
 

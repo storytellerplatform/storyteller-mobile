@@ -9,6 +9,7 @@ import pSearchImage from '../assets/primary-search.png';
 import pRankImage from '../assets/primary-ranking.png';
 import pSettingsImage from '../assets/primary-settings.png';
 import avatarImage from '../assets/avatar.png';
+import rightArrowImage from '../assets/right-arrow.png';
 
 export { 
   homeImage, 
@@ -22,4 +23,5 @@ export {
   pRankImage, 
   pSettingsImage,
   avatarImage,
+  rightArrowImage,
 };

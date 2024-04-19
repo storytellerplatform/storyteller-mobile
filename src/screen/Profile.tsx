@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, View, Text, Image } from 'react-native';
 import Layout from '../components/Layout';
 import { ProfileStackProps } from '../types/index';
-import rightAngle from '../assets/right-arrow-angle.png';
+import { rightArrowImage } from '../utils/image';
 import { avatarImage } from '../utils/image';
 
 interface ProfileProps {
@@ -24,15 +24,15 @@ const Profile: React.FC<ProfileProps> = ({ navigation }) => {
         <View style={styles.profile}>
           <View style={styles.profileBox}>
             <Text style={styles.profileTitle}>歷史紀錄</Text>
-            <Image source={rightAngle} style={styles.profileAngle} />
+            <Image source={rightArrowImage} style={styles.profileAngle} />
           </View>
           <View style={styles.profileBox}>
             <Text style={styles.profileTitle}>夜晚模式</Text>
-            <Image source={rightAngle} style={styles.profileAngle} />
+            <Image source={rightArrowImage} style={styles.profileAngle} />
           </View>
           <View style={styles.profileBox}>
             <Text style={styles.profileTitle}>關於我們</Text>
-            <Image source={rightAngle} style={styles.profileAngle} />
+            <Image source={rightArrowImage} style={styles.profileAngle} />
           </View>
         </View>
       </View>

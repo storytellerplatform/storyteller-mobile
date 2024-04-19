@@ -1,10 +1,10 @@
 import axios from "axios";
-import { StoryType } from "../types";
 
 export const request = axios.create({
   // baseURL: 'http://sttdeployspider-production.up.railway.app',
-  baseURL: 'http://danny10132024-olympic.nord:8050',
-  // baseURL: 'https://stt-deploy-spider-test-nxw3hfm4da-uc.a.run.app',
+  // baseURL: 'http://danny10132024-olympic.nord:8050',
+  // baseURL: 'https://stt-deploy-spider-jxae3suiya-uc.a.run.app',
+  baseURL: 'https://humbly-rich-cattle.ngrok-free.app/'
 });
 
 export const testApi = async () => request.get('/');
