@@ -1,19 +1,18 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ScrollView, View, Text, TouchableOpacity, StyleSheet, StatusBar, Image, Modal, Button, TouchableWithoutFeedback, useWindowDimensions, GestureResponderEvent } from 'react-native';
-import ReadingSettingIcon from '../assets/settings.png';
-import bookdata from '../data/book.json';
 import { bgColors } from '../data/settingStory';
 import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import { Buffer } from 'buffer';
-import { BookType, ReadingStackProps } from '../types';
+import { BookInfoProps, ReadingStackProps } from '../types';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { primaryColor, secondaryColor } from '../globalStyle';
-import PagerView from 'react-native-pager-view';
 import createIdxArray from '../utils/createIndexArr';
-import { createMusic, testApi } from '../Api';
+import { createCatelogContent, createTTS, generateMusic } from '../Api';
 import replaceSpecialChars from './../utils/replaceSpecialChars';
-import { rightArrowImage, settingsImage } from '../utils/image';
+import { graySettingsImage, rightArrowImage } from '../utils/image';
+import PagerView from 'react-native-pager-view';
+import { bookNotFound, unableFetchBook, unableFetchBookContent } from '../utils/alert';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ReadingPageProps {
   navigation: ReadingStackProps['navigation']
@@ -21,14 +20,6 @@ interface ReadingPageProps {
 };
 
 const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
-  // test
-  useEffect(() => {
-    const test = async () => {
-      console.log((await testApi()).data);
-    };
-    test();
-  }, [])
-
   const currentDate = new Date();
   const currentTime = currentDate.toLocaleTimeString('en-US', {
     hour12: false,
@@ -44,20 +35,67 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
   const [settingsModalVisible, setSettingsModalVisible] = useState<boolean>(false);
   const [showHeaderFooter, setShowHeaderFooter] = useState<boolean>(false);
   const [bgColor, setBgColor] = useState<string>('#FCE6C9');
-  const [fontSize, setFontSize] = useState<number>(22);
+  const [fontSize, setFontSize] = useState<number>(16);
   const [isPlaying, setIsPlaying] = useState<boolean>(true);
   const [musicLoading, setMusicLoading] = useState<boolean>(false);
   const [sounds, setSound] = useState<Audio.Sound | null>(null);
+  const [TTS, setTTS] = useState<Audio.Sound | null>(null);
+  const [TTSLoading, setTTSLoading] = useState<boolean>(false);
+  const [bookInfo, setBookInfo] = useState<BookInfoProps | null>(null);
+  const [content, setContent] = useState<string>("");
 
   // 頁面
   const [currentPage, setCurrentPage] = useState<number>(0);
 
-  const id = route.params.id;
-  const book_in_index: BookType | undefined = bookdata.find(book => book.id === id);
+  const bookId = route.params.id;
+  const chapterId = route.params.chapter;
+  const url = route.params.url;
 
-  if (book_in_index === undefined) {
-    return "error";
-  }
+  const lineHeight = 52;
+  const PerPageCount = (width / fontSize) * (height / lineHeight);
+  const totalPages = content.length / PerPageCount;
+
+  /**
+   * todo: 組件卸載時刪除音樂
+   */
+  useEffect(() => { }, []);
+
+  useEffect(() => {
+    const fetchBookList = async () => {
+      try {
+        const storedBookList = await AsyncStorage.getItem('book');
+        const parsedBookList: Array<BookInfoProps> = storedBookList ? JSON.parse(storedBookList) : [];
+        const selectedBook = parsedBookList.find(book => book.id === bookId);
+        if (!selectedBook) {
+          bookNotFound();
+          return;
+        }
+        setBookInfo(selectedBook);
+      } catch (error) {
+        unableFetchBook();
+      }
+    };
+
+    fetchBookList();
+  }, [bookId]);
+
+  useEffect(() => {
+    const fetchBookContent = async () => {
+      try {
+        const bookContent = await createCatelogContent(url.toString());
+        setContent(bookContent.data);
+      } catch (error) {
+        unableFetchBookContent();
+      }
+    };
+
+    fetchBookContent();
+  }, [bookId, chapterId]);
+
+  const contentSlice = (index: number): string => {
+    const curPageContent = content.slice(index * PerPageCount, index * PerPageCount + PerPageCount);
+    return curPageContent;
+  };
 
   const toggleLeisureMode = () => {
     setIsLeisureMode(!isLeisureMode);
@@ -84,45 +122,56 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
     pagerViewRef.current?.setPage(pageNumber);
   };
 
-  // useEffect(() => {
-  //   navigation.setOptions({ headerShown: showHeaderFooter });
-  // }, [showHeaderFooter, navigation]);
+  /**
+    處理音樂工具
+  */
+  const toDataURI = (blob: Blob) =>
+    new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = () => {
+        const uri = reader.result?.toString();
+        resolve(uri);
+      };
+    });
 
-  // useEffect(() => {
-  //   navigation.setOptions({
-  //     title: book_in_index?.title,
-  //     headerStyle: {
-  //       backgroundColor: primaryColor,
-  //     },
-  //     headerTintColor: 'black',
-  //     headerTitleStyle: {
-  //       fontWeight: 'bold',
-  //     },
-  //     headerRight: () => (
-  //       <TouchableOpacity onPress={handleSettingsModal}>
-  //         <Image source={ReadingSettingIcon} style={{ width: 30, height: 30, alignSelf: 'center' }} />
-  //       </TouchableOpacity>
-  //     ),
+  const toBuffer = async (blob: Blob) => {
+    const uri: any = await toDataURI(blob);
+    const base64 = uri.replace(/^.*,/g, "");
+    return Buffer.from(base64, "base64");
+  };
 
-  //   });
-  // }, [navigation, handleSettingsModal]);
+  const constructTempFilePath = async (buffer: any) => {
+    const tempFilePath = FileSystem.cacheDirectory + "audio.mp3";
+    await FileSystem.writeAsStringAsync(
+      tempFilePath,
+      buffer.toString("base64"),
+      {
+        encoding: FileSystem.EncodingType.Base64,
+      }
+    );
+
+    return tempFilePath;
+  };
 
   const fetchAndPlayWavFile = async () => {
     setMusicLoading(true);
 
     try {
-      const response = await createMusic(
-        replaceSpecialChars(book_in_index.content),
-        30,
-      );
 
-      const buffer = Buffer.from(response.data, 'binary').toString('base64');
-      const path = FileSystem.documentDirectory + 'music.wav';
-      await FileSystem.writeAsStringAsync(path, buffer, { encoding: FileSystem.EncodingType.Base64 });
+      // const data = await response.json();
 
-      const { sound } = await Audio.Sound.createAsync({ uri: path });
-      setSound(sound);
+      const response = await generateMusic({
+        texts: replaceSpecialChars(contentSlice(currentPage)),
+        duration: 30,
+      });
+
+      const blob = await response.data;
+      const buffer = await toBuffer(blob);
+      const tempFilePath = await constructTempFilePath(buffer);
+      const { sound } = await Audio.Sound.createAsync({ uri: tempFilePath });
       await sound.playAsync();
+
     } catch (error) {
       console.error('Error fetching the WAV file:', error);
     } finally {
@@ -130,14 +179,15 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
     }
   };
 
-  // 暂停音乐
+  /**
+   * 音樂暫停、重播、刪除...
+   */
   const pauseMusic = async () => {
     if (sounds) {
       await sounds.pauseAsync();
     }
   };
 
-  // 继续播放音乐
   const resumeMusic = async () => {
     if (sounds) {
       await sounds.playAsync();
@@ -161,7 +211,6 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
     }
   };
 
-  // 删除音乐
   const deleteMusic = async () => {
     if (sounds) {
       await sounds.unloadAsync();
@@ -171,29 +220,29 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
     }
   };
 
-  // 组件卸载时，卸载音乐.
-  useEffect(() => {
-    return () => {
-      if (sounds) {
-        sounds.unloadAsync();
-      }
+  /**
+   * 人聲說劇
+   */
+  const fetchTTSAndPlay = async (text: string, gender: boolean = true) => {
+    setTTSLoading(true);
+    try {
+      const response = await createTTS(
+        text,
+        gender
+      );
+
+      const blob = await response.data;
+      const buffer = await toBuffer(blob);
+      const tempFilePath = await constructTempFilePath(buffer);
+      const { sound } = await Audio.Sound.createAsync({ uri: tempFilePath });
+      await sound.playAsync();
+
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setTTSLoading(false);
     };
-  }, [sounds]);
-
-
-  // 組件卸載時停止播放音樂
-  // useEffect(() => {
-  //   return () => {
-  //     if (sound) {
-  //       sound.release();
-  //     }
-  //   };
-  // }, [sound]);
-
-
-  const lineHeight = 52;
-  const PerPageCount = (width / fontSize) * (height / lineHeight);
-  const totalPages = book_in_index.content.length / PerPageCount;
+  };
 
   const handleScreenTap = (event: GestureResponderEvent) => {
     const { locationX } = event.nativeEvent;
@@ -211,6 +260,25 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
     setShowHeaderFooter((prevState) => !prevState);
   };
 
+  if (!bookInfo) {
+    return (
+      <SafeAreaView>
+        <View style={styles.header}>
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+          >
+            <Image style={styles.headerLeftIcon} source={rightArrowImage} />
+          </TouchableOpacity>
+          {/* <Text style={styles.headerText}>{truncateString(bookInfo.title, 15)}</Text> */}
+        </View>
+        {/* Loading Icon */}
+        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+          <Text>Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={{ backgroundColor: `${bgColor}`, ...styles.container }}>
       <StatusBar hidden={true} translucent={true} />
@@ -219,13 +287,13 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
         <>
           <View style={styles.header}>
             <View style={styles.headerLeftSection}>
-              <TouchableOpacity onPress={() => navigation.navigate('Library')}>
+              <TouchableOpacity onPress={() => navigation.goBack()}>
                 <Image style={styles.headerRightIcon} source={rightArrowImage} />
               </TouchableOpacity>
-              <Text style={styles.headerText}>{book_in_index.title}</Text>
+              <Text style={styles.headerText} numberOfLines={2}>{bookInfo.title}</Text>
             </View>
             <TouchableOpacity onPress={() => setSettingsModalVisible((prevState) => !prevState)}>
-              <Image style={styles.headerLeftIcon} source={settingsImage} />
+              <Image style={styles.headerLeftIcon} source={graySettingsImage} />
             </TouchableOpacity>
           </View>
           <TouchableWithoutFeedback
@@ -316,9 +384,9 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
             <View style={styles.fontContainer}>
               <TouchableOpacity
                 style={[styles.fontButton, isLeisureMode ? styles.leisureModeActive : {}]}
-                onPress={toggleLeisureMode}
+                onPress={() => fetchTTSAndPlay("你好 媽喀巴咖 你好 馬卡巴咖 you are my sunshine my only sunshine")}
               >
-                <Text>朗讀</Text>
+                <Text>{TTSLoading ? "Loading..." : "朗讀"}</Text>
               </TouchableOpacity>
             </View>
 
@@ -327,32 +395,41 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
       </Modal>
 
       {/* Main Content */}
-      <PagerView
-        style={{ flex: 1 }}
-        onPageSelected={onPageSelected}
-        ref={pagerViewRef}
-        initialPage={0}
-      >
-        {createIdxArray(totalPages).map((_, index) => (
-          <View key={index} style={{ flex: 1 }}>
-            <TouchableOpacity
-              style={styles.content}
-              onPress={handleScreenTap}
-              activeOpacity={1}
-            >
-              <View style={styles.content}>
-                <Text style={[styles.novelText, { fontSize: fontSize }]} >
-                  {book_in_index.content.slice(_ * PerPageCount, _ * PerPageCount + PerPageCount)}
-                </Text>
+      <View style={{ height: '96%' }}>
+        {content ?
+          <PagerView
+            style={{ flex: 1 }}
+            onPageSelected={onPageSelected}
+            ref={pagerViewRef}
+            initialPage={0}
+          >
+            {createIdxArray(totalPages).map((value, index) => (
+              <View key={index} style={{ flex: 1 }}>
+                <TouchableOpacity
+                  style={styles.content}
+                  onPress={handleScreenTap}
+                  activeOpacity={1}
+                >
+                  <View style={styles.content}>
+                    <Text style={[styles.novelText, { fontSize: fontSize }]} >
+                      {contentSlice(value)}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
-            </TouchableOpacity>
-          </View>
-        ))}
-      </PagerView>
+            ))}
+          </PagerView> :
+          <>
+            <View style={styles.loading}>
+              <Text style={styles.loadingText} >Loading...</Text>
+            </View>
+          </>
+        }
+      </View>
 
       <View style={styles.footer}>
         <View style={{ flex: 0.4, alignItems: 'flex-start' }}>
-          <Text style={styles.footerText}>{book_in_index.title}</Text>
+          <Text style={styles.footerText} numberOfLines={2}>{bookInfo.title}</Text>
         </View>
         <View style={{ flex: 0.2, alignItems: 'center' }}>
           <Text style={[styles.footerText,]}>
@@ -363,6 +440,7 @@ const Reading: React.FC<ReadingPageProps> = ({ navigation, route }) => {
           <Text style={styles.footerText}>{currentTime}</Text>
         </View>
       </View>
+
     </SafeAreaView>
   );
 };
@@ -404,8 +482,9 @@ const styles = StyleSheet.create({
     transform: [{ rotate: '180deg' }],
   },
   headerText: {
+    width: '80%',
     color: '#c4c4c4',
-    fontSize: 20,
+    fontSize: 14,
     fontWeight: '600',
   },
   headerLeftIcon: {
@@ -426,8 +505,8 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     paddingTop: 20,
-    paddingBottom: 30,
-    paddingHorizontal: 6,
+    paddingBottom: 18,
+    paddingHorizontal: 12,
   },
   book_title: {
     fontWeight: 'bold',
@@ -444,7 +523,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   book_content: {
-    lineHeight: 24,
+    lineHeight: 16,
     color: '#333',
     textAlign: 'left',
     paddingHorizontal: 10,
@@ -546,7 +625,7 @@ const styles = StyleSheet.create({
   },
   novelText: {
     paddingHorizontal: 6,
-    lineHeight: 32,
+    lineHeight: 20,
     paddingBottom: 10,
   },
   footer: {
@@ -557,14 +636,44 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    paddingBottom: 10,
+    paddingBottom: 0,
     paddingHorizontal: 24,
     zIndex: 9000,
   },
   footerText: {
-    fontSize: 14,
-    fontWeight: '500'
+    fontSize: 10,
+    fontWeight: '500',
+    opacity: 0.4,
   },
+  footer2: {
+    position: 'absolute',
+    left: 0,
+    bottom: 0,
+    width: '100%',
+    backgroundColor: '#2b2b2b',
+    paddingHorizontal: 20,
+    paddingVertical: 60,
+    zIndex: 9900,
+  },
+  pageNav: {
+    flexDirection: 'row',
+  },
+  pageNavButton: {
+    color: '#FFFFFF',
+    borderColor: '#FFFFFF',
+    borderWidth: 1,
+    borderRadius: 20,
+  },
+  loading: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#717171'
+  }
 });
 
 export default Reading;

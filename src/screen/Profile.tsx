@@ -1,15 +1,25 @@
 import React from 'react';
-import { StyleSheet, View, Text, Image } from 'react-native';
+import { StyleSheet, View, Text, Image, TouchableOpacity } from 'react-native';
 import Layout from '../components/Layout';
 import { ProfileStackProps } from '../types/index';
 import { rightArrowImage } from '../utils/image';
 import { avatarImage } from '../utils/image';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface ProfileProps {
   navigation: ProfileStackProps['navigation']
 };
 
 const Profile: React.FC<ProfileProps> = ({ navigation }) => {
+  const clearAsyncStorage = async () => {
+    try {
+      await AsyncStorage.clear();
+      console.log('AsyncStorage 已清除');
+    } catch (e) {
+      console.error('清除 AsyncStorage 出错:', e);
+    }
+  };
+
   return (
     <Layout navigation={navigation}>
       {/* 这里是 Profile 页面特有的内容 */}
@@ -34,6 +44,13 @@ const Profile: React.FC<ProfileProps> = ({ navigation }) => {
             <Text style={styles.profileTitle}>關於我們</Text>
             <Image source={rightArrowImage} style={styles.profileAngle} />
           </View>
+          <TouchableOpacity
+            style={styles.profileBox}
+            onPress={() => clearAsyncStorage()}
+          >
+            <Text style={styles.profileTitle}>清除資料</Text>
+            <Image source={rightArrowImage} style={styles.profileAngle} />
+          </TouchableOpacity>
         </View>
       </View>
     </Layout>
@@ -72,8 +89,9 @@ const styles = StyleSheet.create({
     marginBottom: 32,
   },
   profileTitle: {
-    fontSize: 24,
-    fontWeight: '500'
+    fontSize: 22,
+    fontWeight: '800',
+    marginBottom: 4,
   },
   profileAngle: {
     width: 24,

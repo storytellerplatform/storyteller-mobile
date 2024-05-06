@@ -1,4 +1,5 @@
 import { NativeStackScreenProps } from "@react-navigation/native-stack";
+import { ImageSourcePropType } from "react-native";
 
 // Page Types
 export type RootStackParamList = {
@@ -7,7 +8,7 @@ export type RootStackParamList = {
   Search: undefined,
   Rank: undefined,
   Profile: undefined,
-  Reading: { id: String },
+  Reading: { id: String, chapter: string, url: string },
   BookInfo: { id: String },
   Tests: undefined,
 };
@@ -23,23 +24,38 @@ export type ProfileStackProps = NativeStackScreenProps<RootStackParamList, 'Prof
 export type ReadingStackProps = NativeStackScreenProps<RootStackParamList, 'Reading'>;
 export type BookInfoStackProps = NativeStackScreenProps<RootStackParamList, 'BookInfo'>;
 
-export type LayoutStackProps = NativeStackScreenProps<RootStackParamList, 'Home' | 'Profile' | 'Search' | 'Rank' | 'Library'>;
+export type LayoutStackProps = NativeStackScreenProps<RootStackParamList, 'Home' | 'Profile' | 'Search' | 'Rank' | 'Library' | 'BookInfo'>;
 export type BookListStackProps = NativeStackScreenProps<RootStackParamList, 'Library'>;
 
 // Components
-export type BookType = {
-  id: string;
-  title: string;
-  author: string;
-  subtitle: string;
-  imageUrl: string;
-  content: string;
+export interface ChapterProps {
+  cid: string | null;
+  name: string;
+  url: string;
 };
 
-export type StoryType = {
-  id: string;
+export interface BookProps {
   title: string;
   img: string;
   brife_content: string;
-  content: string;
+  content: {
+    [volume: string]: Array<ChapterProps>;
+  };
+}
+
+export interface BookInfoProps {
+  id: string;
+  title: string;
+  img: string;
+  url: string;
+  subtitle: string;
 };
+
+export type AllChapterProp = { [volume: string]: Array<ChapterProps> };
+
+export interface BookContentProps {
+  id: string;
+  content: {
+    [volume: string]: Array<ChapterProps>;
+  };
+}; 

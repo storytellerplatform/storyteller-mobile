@@ -1,20 +1,26 @@
 import React from 'react';
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import { BookListStackProps, BookType } from '../types';
+import { BookListStackProps } from '../types';
 
 interface BookListProps {
-  item: BookType
+  id: string;
+  title: string;
+  author?: string;
+  subtitle?: string;
+  imageUrl: string;
   navigation: BookListStackProps['navigation']
 };
 
-const BookList: React.FC<BookListProps> = ({ item, navigation }) => {
+const BookList: React.FC<BookListProps> = ({ id, title, imageUrl, navigation }) => {
   return (
-    <TouchableOpacity style={styles.item} onPress={() => navigation.navigate('Reading', { id: item.id })}>
-      <Image source={{ uri: item.imageUrl }} style={styles.image} />
+    <TouchableOpacity
+      style={styles.item}
+      onPress={() => navigation.navigate('BookInfo', { id: id })}
+    >
+      <Image source={{ uri: imageUrl }} style={styles.image} />
       <View style={styles.textContainer}>
-        <Text style={styles.title}>{item.title}</Text>
-        <Text style={styles.author}>{item.author}</Text>
-        <Text style={styles.subtitle}>{item.subtitle}</Text>
+        <Text style={styles.title}>{title}</Text>
+        {/* <Text style={styles.subtitle}>{subtitle}</Text> */}
       </View>
     </TouchableOpacity>
   );
@@ -33,18 +39,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   image: {
-    width: 80,
-    height: 100,
+    width: 100,
+    height: 120,
     borderRadius: 10,
-    marginRight: 16,
+    marginRight: 36,
   },
   textContainer: {
     flex: 1,
   },
   title: {
-    flex: 0.1,
+    width: '84%',
     color: 'black',
-    fontSize: 16,
+    fontSize: 20,
     fontWeight: '700',
   },
   author: {

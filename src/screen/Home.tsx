@@ -1,8 +1,8 @@
-import React from 'react';
-import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { ScrollView, StyleSheet, Text, View, TouchableOpacity, Image, Alert } from 'react-native';
 import Layout from '../components/Layout';
-import storiesData from '../data/stories';
-import { HomeStackProps } from '../types/index';
+import { BookInfoProps, HomeStackProps } from '../types/index';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface StoryType {
   imageUrl: string;
@@ -10,10 +10,10 @@ interface StoryType {
 };
 
 const NewStory = ({ imageUrl, username }: StoryType) => (
-  <TouchableOpacity style={styles.story}>
+  <View style={styles.story}>
     <Image source={{ uri: imageUrl }} style={styles.storyImage} />
-    <Text style={styles.storyText}>{username}</Text>
-  </TouchableOpacity>
+    <Text style={styles.storyText} numberOfLines={2}>{username}</Text>
+  </View>
 );
 
 interface HomePorps {
@@ -21,6 +21,27 @@ interface HomePorps {
 };
 
 const Home: React.FC<HomePorps> = ({ navigation }) => {
+  const [bookData, setBookData] = useState<Array<BookInfoProps>>([]);
+
+  const navgateBookInfo = (bookId: string) => {
+    navigation.navigate('BookInfo', { id: bookId })
+  };
+
+  useEffect(() => {
+    const fetchBookData = async () => {
+      try {
+        const storedBookData = await AsyncStorage.getItem('book');
+        console.log(storedBookData);
+        const parsedBookData = storedBookData ? JSON.parse(storedBookData) : [];
+        setBookData(parsedBookData);
+      } catch (err) {
+        console.error(err);
+        Alert.alert('Error', 'Unable to fetch story');
+      };
+    };
+    fetchBookData();
+  }, []);
+
   return (
     <Layout navigation={navigation} showBackButton={false} >
       <ScrollView
@@ -34,12 +55,16 @@ const Home: React.FC<HomePorps> = ({ navigation }) => {
             showsHorizontalScrollIndicator={false}
             style={styles.stories}
           >
-            {storiesData.map(story => (
-              <NewStory
-                key={story.id}
-                imageUrl={story.imageUri}
-                username={story.username}
-              />
+            {bookData.map(book => (
+              <TouchableOpacity
+                key={book.id}
+                onPress={() => navgateBookInfo(book.id)}
+              >
+                <NewStory
+                  imageUrl={book.img}
+                  username={book.title}
+                />
+              </TouchableOpacity>
             ))}
           </ScrollView>
         </View>
@@ -47,67 +72,81 @@ const Home: React.FC<HomePorps> = ({ navigation }) => {
         <View style={styles.mainContainer}>
           <View style={styles.mainContent}>
             {/* 推薦書籍 */}
-            <View style={styles.recommendNovelHeader}>
+            {/* <View style={styles.recommendNovelHeader}>
               <Text style={styles.titleText}>推薦好書</Text>
               <Text style={styles.moreNovelLink}>查看更多</Text>
-            </View>
-
+            </View> */}
+            {/* 
             <View style={styles.recommendNovel}>
               <ScrollView
                 horizontal={true}
                 showsHorizontalScrollIndicator={false}
               >
-                {/* 推薦書籍第一排 */}
-                {storiesData.map((story, index) => (
+                {bookData.map((book, index) => (
                   index % 2 == 1 && (
-                    <View key={story.id} >
-                      <View style={styles.recommendNovelBox}>
+                    <View key={book.id} >
+                      <TouchableOpacity
+                        style={styles.recommendNovelBox}
+                        onPress={() => navgateBookInfo(book.id)}
+                      >
                         <Image
                           style={styles.novelImage}
-                          source={{ uri: story.imageUri }}
+                          source={{ uri: book.img }}
                         />
-                        <Text style={styles.novelName}>
-                          {story.name}
+                        <Text style={styles.novelName} numberOfLines={2}>
+                          {book.title}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
 
-                      <View style={styles.recommendNovelBox}>
+                      <TouchableOpacity
+                        style={styles.recommendNovelBox}
+                        onPress={() => navgateBookInfo(bookData[index - 1].id)}
+                      >
                         <Image
                           style={styles.novelImage}
-                          source={{ uri: storiesData[index - 1].imageUri }}
+                          source={{ uri: bookData[index - 1].img }}
                         />
                         <Text style={styles.novelName}>
-                          {storiesData[index - 1].name}
+                          {bookData[index - 1].title}
                         </Text>
-                      </View>
+                      </TouchableOpacity>
                     </View>
                   )
                 ))}
               </ScrollView>
             </View>
-
+ */}
             {/* 熱門書籍 */}
 
             {/* 排行榜 */}
             <View style={styles.rankContainer}>
-              <Text style={styles.titleText}>熱門排行</Text>
+              <Text style={styles.titleText}>書籍清單</Text>
               <View style={styles.rankCol}>
-                {storiesData.map(story => (
-                  <View key={story.id} style={styles.rankNovel}>
+                {bookData.map(book => (
+                  <TouchableOpacity
+                    key={book.id}
+                    style={styles.rankNovel}
+                    onPress={() => navgateBookInfo(book.id)}
+                  >
                     <Image
                       style={styles.rankNovelImage}
-                      source={{ uri: story.imageUri }}
+                      source={{ uri: book.img }}
                     />
                     <View style={styles.rankNovelIntro}>
-                      <Text style={styles.rankNovelName}>{story.name}</Text>
+                      <Text
+                        style={styles.rankNovelName}
+                        numberOfLines={2}
+                      >
+                        {book.title}
+                      </Text>
                       <Text
                         numberOfLines={4}
                         style={styles.rankNovelDescribe}
                       >
-                        {story.describe}
+                        {book.subtitle}
                       </Text>
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 ))}
               </View>
             </View>
@@ -159,8 +198,9 @@ const styles = StyleSheet.create({
   storyText: {
     color: '#000',
     fontSize: 12,
-    fontWeight: '500',
+    fontWeight: '400',
     marginTop: 2,
+    width: 80,
   },
   mainContainer: {
     alignItems: 'center',
@@ -176,9 +216,9 @@ const styles = StyleSheet.create({
     fontSize: 48
   },
   titleText: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: '600',
-    marginBottom: 10,
+    marginBottom: 20,
   },
   recommendNovel: {
     height: 'auto',
@@ -186,7 +226,7 @@ const styles = StyleSheet.create({
   },
   recommendNovelBox: {
     height: 200,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   novelImage: {
     width: 120,
@@ -227,7 +267,7 @@ const styles = StyleSheet.create({
   },
   rankNovelImage: {
     width: 120,
-    height: 160,
+    height: 180,
     borderRadius: 10,
     marginEnd: 6,
   },
@@ -235,12 +275,12 @@ const styles = StyleSheet.create({
     width: '60%',
   },
   rankNovelName: {
-    fontSize: 20,
+    fontSize: 16,
     fontWeight: 'bold',
     marginBottom: 10,
   },
   rankNovelDescribe: {
-    fontSize: 14,
+    fontSize: 12,
     opacity: 0.6,
   }
 });

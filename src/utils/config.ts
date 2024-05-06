@@ -1,0 +1,1 @@
+const AI_MODEL_LINK = 'https://humbly-rich-cattle.ngrok-free.app';

@@ -2,13 +2,17 @@ import React from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, Image, ScrollView } from 'react-native';
 import Layout from '../components/Layout';
 import { RankStackProps } from '../types/index';
-import storiesData from '../data/stories';
+import BookData from '../data/book.json';
 
 interface RankProps {
   navigation: RankStackProps['navigation']
 };
 
 const Rank: React.FC<RankProps> = ({ navigation }) => {
+  const navgateBookInfo = (bookId: string) => {
+    navigation.navigate('BookInfo', { id: bookId })
+  };
+
   return (
     <Layout navigation={navigation} showBackButton={false} >
       {/* 这里是 Rank 页面特有的内容 */}
@@ -23,22 +27,22 @@ const Rank: React.FC<RankProps> = ({ navigation }) => {
           showsHorizontalScrollIndicator={false}
         >
           <View style={styles.rankCol}>
-            {storiesData.map(story => (
-              <View key={story.id} style={styles.rankNovel}>
+            {BookData.map(story => (
+              <TouchableOpacity key={story.id} style={styles.rankNovel} onPress={() => navgateBookInfo(story.id)}>
                 <Image
                   style={styles.rankNovelImage}
-                  source={{ uri: story.imageUri }}
+                  source={{ uri: story.imageUrl }}
                 />
                 <View style={styles.rankNovelIntro}>
-                  <Text style={styles.rankNovelName}>{story.name}</Text>
+                  <Text style={styles.rankNovelName}>{story.title}</Text>
                   <Text
                     numberOfLines={4}
                     style={styles.rankNovelDescribe}
                   >
-                    {story.describe}
+                    {story.subtitle}
                   </Text>
                 </View>
-              </View>
+              </TouchableOpacity>
             ))}
           </View>
         </ScrollView>
@@ -50,7 +54,7 @@ const Rank: React.FC<RankProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    marginBottom: 32,
+    marginBottom: 56,
   },
   topContainer: {
     position: 'absolute',

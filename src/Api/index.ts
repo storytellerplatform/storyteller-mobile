@@ -1,26 +1,48 @@
-import axios from "axios";
+import axios, { AxiosRequestConfig, AxiosResponse } from "axios";
+import { generateMusicRequest } from "../types/api";
 
-export const request = axios.create({
-  // baseURL: 'http://sttdeployspider-production.up.railway.app',
-  // baseURL: 'http://danny10132024-olympic.nord:8050',
-  // baseURL: 'https://stt-deploy-spider-jxae3suiya-uc.a.run.app',
+export const modelRequest = axios.create({
   baseURL: 'https://humbly-rich-cattle.ngrok-free.app/'
 });
 
-export const testApi = async () => request.get('/');
+export const moodModelRequest = axios.create({
+  baseURL: 'https://stt-deploy-mood-jxae3suiya-uc.a.run.app/',
+});
 
-export const testApi2 = async (TestData: string) => request.post('/mood_analyze', { TestData });
+export const climbRequest = axios.create({
+  baseURL: 'https://stt-deploy-spider-jxae3suiya-uc.a.run.app/',
+});
 
-export const createCatelog = async (url: string) => request.post(
-  '/Novel_catalog', { url }
+const WENKU8_URL = 'https://www.wenku8.net/modules/article/reader.php';
+
+export const testApi = async () => modelRequest.get('/');
+
+export const testApi2 = async (TestData: string) => moodModelRequest.post('/mood_analyze', { TestData }
 );
 
-export const createCatelogContent = async (url: string) => request.post(
-  '/Novel_catalog_content', { url }
+export const createCatelog = async (url: string, config?: AxiosRequestConfig) => modelRequest.post(
+  '/Novel_catalog', { url }, config
 );
 
-export const createMusic = async (texts: string, duration: number) => request.post(
-  '/music_generate', { texts, duration }, {
-    responseType: 'arraybuffer',
+export const createCatelogContent = async (url: string) => modelRequest.post(
+  '/Novel_page_content', { url }
+);
+
+export const createMusic = async (texts: string, duration: number) => modelRequest.post(
+  '/music_generate', { texts, duration },
+  { responseType: 'arraybuffer' }
+);
+
+export const generateMusic = async (request: generateMusicRequest, config?: AxiosRequestConfig ) => modelRequest.post(
+  '/music_generate', request, {
+    responseType: 'blob',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    ...config
   }
+);
+
+export const createTTS = async (text: string, gender: boolean) => modelRequest.post(
+  '/TTS', { text, gender }
 );
